@@ -30,14 +30,14 @@ parser.add_argument('--log', metavar='log', nargs='?', default='INFO',
 
 parser.add_argument('--output', nargs='?', default='images/', help='Working directory')
 
-parser.add_argument('--image-size', dest='imgsize', nargs='?', default='320x240')
+parser.add_argument('--image-size', dest='imgsize', nargs='?', default=False)
 
 # parser.add_argument('--with-groundtruth', dest='groundtruth', action='store_true')
 #
 # parser.add_argument("--ground-truth", dest="groundtruthfile",
 #                     default="classification/ground_truth.json")
 
-parser.add_argument("--image-format", dest="imageext", default='jpg')
+parser.add_argument("--image-format", dest="imageext", default='png')
 
 parser.add_argument('--lazycache-url', dest='lazycache', default=os.environ.get("LAZYCACHE_URL", None),
                     help='URL to Lazycache repo server (only needed if classifying)')
@@ -47,8 +47,11 @@ logging.basicConfig( level=args.log.upper() )
 
 qt = camhd.lazycache( args.lazycache )
 
-img_size = args.imgsize.split('x')
-img_size = ( int(img_size[0]), int(img_size[1]))
+if args.imgsize:
+    img_size = args.imgsize.split('x')
+    img_size = ( int(img_size[0]), int(img_size[1]))
+else:
+    img_size = False
 
 if not args.input:
     logging.warning("Input file must be specified...")
@@ -62,6 +65,13 @@ regions = mmd.RegionFile.load(args.input)
 mov = regions.mov
 
 for region in regions.static_regions():
+
+    if region.unknown:
+        continue
+
+    if not re.search('.*z0', region.scene_tag):
+        continue
+
     sample_frame = region.start_frame + 0.5 * (region.end_frame - region.start_frame)
 
     basename = path.splitext(path.basename(regions.mov))[0]
@@ -70,13 +80,13 @@ for region in regions.static_regions():
     if args.force or not path.exists( img_file ):
         logging.info("Fetching frame %d from %s for contact sheet" % (sample_frame, basename))
 
-        if args.imgsize:
-            img = qt.get_frame( regions.mov, sample_frame, format=args.imageext )
-            img.thumbnail( img_size )  # PIL.thumbnail preserves aspect rati
-            img.save( img_file )
+        if img_size:
+            img = qt.get_frame(regions.mov, sample_frame, format=args.imageext)
+            img.thumbnail(img_size)  # PIL.thumbnail preserves aspect rati
+            img.save(img_file)
         else:
             # Save directly
-            qt.save_frame( url, sample_frame, img_file, format=args.imageext )
+            qt.save_frame(regions.mov, sample_frame, img_file, format=args.imageext)
 
 
 
