@@ -3,6 +3,7 @@
 import logging
 import PhotoScan
 import glob
+import os
 
 import argparse
 
@@ -41,6 +42,8 @@ logging.info("Photoscan %s activated" % ("is" if PhotoScan.Application.activated
 
 doc = PhotoScan.app.document
 chunk = doc.addChunk()
+group = chunk.addCameraGroup()
+group.type = PhotoScan.CameraGroup.Station
 
 images = glob.glob( args.input + "/*")
 
@@ -52,6 +55,14 @@ logging.info("Adding %d images" % len(images))
 
 chunk.addPhotos( images, PhotoScan.FlatLayout )
 
-chunk.matchPhotos(accuracy=PhotoScan.HighAccuracy, generic_preselection=True, reference_preselection=False)
+for c in chunk.cameras:
+    c.group = group
 
+chunk.matchPhotos(accuracy=PhotoScan.HighAccuracy, generic_preselection=True, reference_preselection=False)
 chunk.alignCameras()
+
+chunk.buildDenseCloud(quality=PhotoScan.MediumQuality)
+
+chunk.buildModel(surface=PhotoScan.Arbitrary, interpolation=PhotoScan.EnabledInterpolation)
+
+doc.save(path="%s/project.psx" % os.getcwd(), chunks=doc.chunks)
