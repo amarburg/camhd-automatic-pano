@@ -61,8 +61,18 @@ for c in chunk.cameras:
 chunk.matchPhotos(accuracy=PhotoScan.HighAccuracy, generic_preselection=True, reference_preselection=False)
 chunk.alignCameras()
 
-chunk.buildDenseCloud(quality=PhotoScan.MediumQuality)
+chunk.transform.rotation = PhotoScan.Utils.ypr2mat(PhotoScan.Vector([180,0,180]))
 
-chunk.buildModel(surface=PhotoScan.Arbitrary, interpolation=PhotoScan.EnabledInterpolation)
+# for c in chunk.cameras:
+#     print(c.transform)
+
+
+
+# ## Find first aligned image
+# first = next(c for c in chunk.cameras if c.transform)
+# print(first.photo.path)
+# first.reference.rotation = PhotoScan.Vector([45,45,45])
 
 doc.save(path="%s/project.psx" % os.getcwd(), chunks=doc.chunks)
+
+## Try exporting a panorama
