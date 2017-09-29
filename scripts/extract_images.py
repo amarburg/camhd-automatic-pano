@@ -29,11 +29,12 @@ parser.add_argument('--log', metavar='log', nargs='?', default='INFO',
                     help='Logging level')
 
 parser.add_argument('--output', nargs='?', default='images/', help='Working directory')
+parser.add_argument('--mov-output-dir', dest='movoutputdir', action='store_true')
 
 parser.add_argument('--image-size', dest='imgsize', nargs='?', default=False)
 
-# parser.add_argument('--with-groundtruth', dest='groundtruth', action='store_true')
-#
+parser.add_argument('--flatten', default=False, action='store_true')
+
 # parser.add_argument("--ground-truth", dest="groundtruthfile",
 #                     default="classification/ground_truth.json")
 
@@ -57,12 +58,17 @@ if not args.input:
     logging.warning("Input file must be specified...")
     exit(-1)
 
-# Create output directory
-os.makedirs(args.output,exist_ok=True)
-
 logging.info("Processing %s" % args.input)
 regions = mmd.RegionFile.load(args.input)
-mov = regions.mov
+
+output_dir = args.output
+if args.movoutputdir:
+    output_dir += "/" + regions.basename
+
+# Create output directory
+os.makedirs(output_dir,exist_ok=True)
+
+r = {}
 
 for region in regions.static_regions():
 
@@ -72,21 +78,53 @@ for region in regions.static_regions():
     if not re.search('.*z0', region.scene_tag):
         continue
 
-    sample_frame = region.start_frame + 0.5 * (region.end_frame - region.start_frame)
+    # Take first instance of each scene tag
+    if region.scene_tag in r:
 
-    basename = path.splitext(path.basename(regions.mov))[0]
-    img_file = args.output + "/" + "%s_%d.%s" % (basename, sample_frame, args.imageext)
+        if args.flatten:
+            continue
 
-    if args.force or not path.exists( img_file ):
-        logging.info("Fetching frame %d from %s for contact sheet" % (sample_frame, basename))
+    else:
+        r[region.scene_tag] = []
 
-        if img_size:
-            img = qt.get_frame(regions.mov, sample_frame, format=args.imageext)
-            img.thumbnail(img_size)  # PIL.thumbnail preserves aspect rati
-            img.save(img_file)
-        else:
-            # Save directly
-            qt.save_frame(regions.mov, sample_frame, img_file, format=args.imageext)
+    r[region.scene_tag].append(region)
+
+
+img_files = {}
+scene_tags = {}
+
+for key,rs in r.items():
+
+    for region in rs:
+        sample_frame = region.start_frame + 0.5 * (region.end_frame - region.start_frame)
+
+        basename = path.splitext(path.basename(regions.mov))[0]
+        img_file = output_dir + "/" + "%s_%d.%s" % (basename, sample_frame, args.imageext)
+
+        img_files[region] = img_file
+
+        if not region.scene_tag in scene_tags:
+            scene_tags[region.scene_tag] = []
+
+        scene_tags[region.scene_tag].append(img_file)
+
+        if args.force or not path.exists( img_file ):
+            logging.info("Fetching frame %d from %s for contact sheet" % (sample_frame, basename))
+
+            if img_size:
+                img = qt.get_frame(regions.mov, sample_frame, format=args.imageext)
+                img.thumbnail(img_size)  # PIL.thumbnail preserves aspect rati
+                img.save(img_file)
+            else:
+                # Save directly
+                qt.save_frame(regions.mov, sample_frame, img_file, format=args.imageext)
+
+
+## Write an annotation file
+json_file = output_dir + "/images.json"
+with open(json_file, 'w') as f:
+    json.dump(scene_tags, f, indent='  ')
+
 
 
 
