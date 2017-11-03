@@ -91,7 +91,7 @@ for c in chunk.cameras:
 chunk.matchPhotos(accuracy=PhotoScan.HighAccuracy, generic_preselection=True, reference_preselection=False)
 chunk.alignCameras()
 
-chunk.transform.rotation = PhotoScan.Utils.ypr2mat(PhotoScan.Vector([180,0,180]))
+chunk.transform.rotation = PhotoScan.Utils.ypr2mat(PhotoScan.Vector([180,-20,180]))
 
 # for c in chunk.cameras:
 #     print(c.transform)

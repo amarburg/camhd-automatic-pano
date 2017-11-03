@@ -33,7 +33,7 @@ parser.add_argument('--mov-output-dir', dest='movoutputdir', action='store_true'
 
 parser.add_argument('--image-size', dest='imgsize', nargs='?', default=False)
 
-parser.add_argument('--flatten', default=False, action='store_true')
+parser.add_argument('--flatten', default=True, action='store_true')
 
 # parser.add_argument("--ground-truth", dest="groundtruthfile",
 #                     default="classification/ground_truth.json")
@@ -68,26 +68,55 @@ if args.movoutputdir:
 # Create output directory
 os.makedirs(output_dir,exist_ok=True)
 
-r = {}
+r = { "transit": [] }
 
-for region in regions.static_regions():
+transit = False
+transit_regions = []
 
-    if region.unknown:
-        continue
+for region in regions.regions():
 
-    if not re.search('.*z0', region.scene_tag):
-        continue
+    if region.static:
 
-    # Take first instance of each scene tag
-    if region.scene_tag in r:
 
-        if args.flatten:
+        if region.unknown:
             continue
 
-    else:
-        r[region.scene_tag] = []
+        print(region.scene_tag)
 
-    r[region.scene_tag].append(region)
+        if not re.search('.*z0', region.scene_tag):
+            continue
+
+        if re.search('.*_p0_z0', region.scene_tag):
+            transit = True
+        else:
+            transit = False
+            if len(transit_regions) > 0:
+                print("Have %d transit regions" % len(transit_regions))
+
+                r["transit"] += transit_regions
+
+        transit_regions = []
+
+
+        # Take first instance of each scene tag
+        if region.scene_tag in r:
+
+            if args.flatten:
+                continue
+
+        else:
+            r[region.scene_tag] = []
+
+        r[region.scene_tag].append(region)
+
+    else:
+
+        if not transit:
+            continue
+
+        if re.match('[NSWE]*', region.type):
+            transit_regions.append(region)
+
 
 
 img_files = {}
@@ -96,28 +125,35 @@ scene_tags = {}
 for key,rs in r.items():
 
     for region in rs:
-        sample_frame = region.start_frame + 0.5 * (region.end_frame - region.start_frame)
 
-        basename = path.splitext(path.basename(regions.mov))[0]
-        img_file = output_dir + "/" + "%s_%d.%s" % (basename, sample_frame, args.imageext)
+        splits = [0.5]
+        if key == "transit":
+            splits = [0.25,0.5,0.75]
 
-        img_files[region] = img_file
 
-        if not region.scene_tag in scene_tags:
-            scene_tags[region.scene_tag] = []
+        for s in splits:
+            sample_frame = region.start_frame + s * (region.end_frame - region.start_frame)
 
-        scene_tags[region.scene_tag].append(img_file)
+            basename = path.splitext(path.basename(regions.mov))[0]
+            img_file = output_dir + "/" + "%s_%06d.%s" % (basename, sample_frame, args.imageext)
 
-        if args.force or not path.exists( img_file ):
-            logging.info("Fetching frame %d from %s for contact sheet" % (sample_frame, basename))
+            img_files[region] = img_file
 
-            if img_size:
-                img = qt.get_frame(regions.mov, sample_frame, format=args.imageext)
-                img.thumbnail(img_size)  # PIL.thumbnail preserves aspect rati
-                img.save(img_file)
-            else:
-                # Save directly
-                qt.save_frame(regions.mov, sample_frame, img_file, format=args.imageext)
+            if not region.scene_tag in scene_tags:
+                scene_tags[region.scene_tag] = []
+
+            scene_tags[region.scene_tag].append(img_file)
+
+            if args.force or not path.exists( img_file ):
+                logging.info("Fetching frame %d from %s for contact sheet" % (sample_frame, basename))
+
+                if img_size:
+                    img = qt.get_frame(regions.mov, sample_frame, format=args.imageext)
+                    img.thumbnail(img_size)  # PIL.thumbnail preserves aspect rati
+                    img.save(img_file)
+                else:
+                    # Save directly
+                    qt.save_frame(regions.mov, sample_frame, img_file, format=args.imageext)
 
 
 ## Write an annotation file

@@ -4,7 +4,7 @@ require 'pathname'
 photoscan_bin = "/opt/photoscan-pro/photoscan.sh"
 
 task :default do
-  sh photoscan_bin, "-r", "scripts/photoscan.py"   #, "--input", "images/CAMHDA301-20170915T001500/"
+  sh photoscan_bin, "-r", "scripts/photoscan.py",   "--input", "images/CAMHDA301-20170915T091500/", '--save-project-as', 'projects/CAMHDA301-20170915T091500.psx'
 end
 
 task :help do
